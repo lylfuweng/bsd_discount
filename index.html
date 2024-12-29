@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>折扣计算器</title>
+    <style>
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .input-area {
+            margin-bottom: 20px;
+        }
+
+        .price-input-group {
+            margin: 10px 0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 5px;
+        }
+
+        .close {
+            float: right;
+            cursor: pointer;
+            font-size: 24px;
+        }
+
+        .real-time-discount {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="input-container" id="inputContainer">
+            <!-- 输入框将在这里动态添加 -->
+        </div>
+        <div class="real-time-discount" id="realTimeDiscount">
+            实时平均折扣率: 0%
+        </div>
+        <button onclick="addInputField()">添加价格输入框</button>
+        <button onclick="calculate()">计算最优方案</button>
+    </div>
+
+    <!-- 弹框 -->
+    <div id="resultModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="modalResult"></div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时添加第一个输入框
+        window.onload = function () {
+            addInputField();
+        }
+
+        function addInputField() {
+            const container = document.getElementById('inputContainer');
+            const div = document.createElement('div');
+            div.className = 'price-input-group';
+
+            div.innerHTML = `
+                <input type="number" class="price-input" placeholder="输入价格">
+                <button onclick="removeInputField(this)">删除</button>
+            `;
+
+            container.appendChild(div);
+        }
+
+        function removeInputField(button) {
+            const inputGroup = button.parentElement;
+            if (document.getElementsByClassName('price-input-group').length > 1) {
+                inputGroup.remove();
+                updateRealTimeDiscount(); // 删除输入框后更新折扣
+            }
+        }
+
+        function getPrices() {
+            const inputs = document.getElementsByClassName('price-input');
+            const prices = [];
+
+            for (let input of inputs) {
+                const price = parseFloat(input.value);
+                if (price && price > 0) {
+                    prices.push(price);
+                }
+            }
+
+            return prices;
+        }
+
+        // 添加输入框值变化的事件监听
+        document.addEventListener('input', function (e) {
+            if (e.target.classList.contains('price-input')) {
+                updateRealTimeDiscount();
+            }
+        });
+
+        function updateRealTimeDiscount() {
+            const prices = getPrices();
+            if (prices.length === 0) {
+                document.getElementById('realTimeDiscount').textContent = '实时平均折扣率: 0%';
+                return;
+            }
+
+            const result = calculateOptimalDiscount(prices);
+            document.getElementById('realTimeDiscount').textContent =
+                `实时平均折扣率: ${result.averageDiscount}%`;
+        }
+        
+        function computeActualAmount(firstOrders, secondOrders) {
+                let firstTotalAmount = 0;
+                for (let firstOrder of firstOrders) {
+                    firstTotalAmount += firstOrder;
+                }
+                let discountAmount = Math.floor(firstTotalAmount / 800) * 600;
+                let secondTotalAmount = 0;
+                for (let i = 0; i < secondOrders.length; i++) {
+                    secondTotalAmount += secondOrders[i];
+                }
+                let secondActualAmount = 0;
+                if (secondTotalAmount > discountAmount) {
+                    secondActualAmount = secondTotalAmount - discountAmount;
+                }
+                return firstTotalAmount + secondActualAmount;
+            }
+
+        function calculateOptimalDiscount(prices) {
+            if (prices.length === 1) {
+                return {
+                    firstPayments: prices,
+                    secondPayments: [],
+                    averageDiscount: "0.00",
+                    secondActualAmount: "0.00",
+                    totalPayment: prices[0],
+                    totalOriginal: prices[0]
+                };
+            }
+
+            // 满800返600最佳优惠拼单方案计算
+            let totalAmount = 0;
+            let bestFirstOrders = new Array(prices.length).fill(0);
+            let bestSecondOrders = new Array(prices.length).fill(0);
+            let bestActualAmount = Number.MAX_SAFE_INTEGER;
+            let firstOrders = new Array(prices.length).fill(0);
+            let secondOrders = new Array(prices.length).fill(0);
+
+            for (let numElements = 1; numElements <= prices.length; numElements++) {
+                // 生成numElements个元素的所有排列组合
+                let index = new Array(numElements).fill(0);
+                for (let i = 0; i < numElements; i++) {
+                    index[i] = i;
+                }
+                while (true) {
+                    // 清空firstOrders和secondOrders数组
+                    firstOrders.fill(0);
+                    secondOrders.fill(0);
+                    let indexB = 0;
+                    let indexC = 0;
+                    // 填充firstOrders数组
+                    for (let i of index) {
+                        firstOrders[indexB++] = prices[i];
+                    }
+                    // 填充secondOrders数组
+                    for (let i = 0; i < prices.length; i++) {
+                        let inB = false;
+                        for (let j of index) {
+                            if (i === j) {
+                                inB = true;
+                                break;
+                            }
+                        }
+                        if (!inB) {
+                            secondOrders[indexC++] = prices[i];
+                        }
+                    }
+                    // 打印firstOrders和secondOrders数组的内容
+                    console.log("firstOrders: " + firstOrders.slice(0, indexB) + ", secondOrders: " + secondOrders.slice(0, indexC));
+                    // 计算最低实付
+                    let actualAmount = computeActualAmount(firstOrders, secondOrders);
+                    if (bestActualAmount > actualAmount) {
+                        bestActualAmount = actualAmount;
+                        bestFirstOrders = [...firstOrders];
+                        bestSecondOrders = [...secondOrders];
+                    }
+
+                    // 生成下一个排列组合
+                    let k = numElements - 1;
+                    while (k >= 0 && index[k] === prices.length - numElements + k) {
+                        k--;
+                    }
+                    if (k < 0) {
+                        break;
+                    }
+                    index[k]++;
+                    for (let i = k + 1; i < numElements; i++) {
+                        index[i] = index[k] + i - k;
+                    }
+                }
+            }
+
+            for (let i of prices) {
+                totalAmount += i;
+            }
+            console.log("总金额：" + totalAmount);
+            console.log("最低实付金额：" + bestActualAmount);
+            console.log("最优折扣：" + bestActualAmount / totalAmount);
+            console.log("第一次付款金额：" + bestFirstOrders);
+            console.log("第二次付款金额：" + bestSecondOrders);
+            let firstPayment=0;
+            for (let i of bestFirstOrders) {
+                firstPayment += i;
+            }
+            return {
+                firstPayments: bestFirstOrders.filter(item => item!== 0),
+                secondPayments: bestSecondOrders.filter(item => item!== 0),
+                averageDiscount: bestActualAmount / totalAmount * 100,
+                secondActualAmount: bestActualAmount-firstPayment,
+                totalPayment: bestActualAmount,
+                totalOriginal: totalAmount
+            };
+        }
+
+        function calculate() {
+            const prices = getPrices();
+
+            if (prices.length === 0) {
+                alert('请输入有效价格！');
+                return;
+            }
+
+            const result = calculateOptimalDiscount(prices);
+
+            // 构建第二次支付的详细信息
+            const secondPaymentsInfo = result.secondPayments.length > 0
+                ? result.secondPayments.map(payment => {
+                    if (payment.discount > 0) {
+                        return `原价${payment.originalPrice}元 - 优惠${payment.discount}元 = ${payment.finalPayment}元`;
+                    } else {
+                        return `${payment.originalPrice}元（无可用优惠券）`;
+                    }
+                }).join('<br>')
+                : '无需第二次支付';
+
+            // 显示结果在弹框中
+            const resultHTML = `
+                <h3>计算结果：</h3>
+                <p>总原价: ${result.totalOriginal}元</p>
+                <p>第一次支付价格: <br>${result.firstPayments.join(', ')}</p>
+                <p>第二次支付价格: <br>${result.secondPayments.join(', ')}</p>
+                <p>第二次优惠后实际支付: <br><label style='color:red;'>${result.secondActualAmount}元</label></p>
+                <p>总支付金额: ${result.totalPayment}元</p>
+                <p>平均折扣率: ${result.averageDiscount}%</p>
+            `;
+
+            document.getElementById('modalResult').innerHTML = resultHTML;
+            document.getElementById('resultModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('resultModal').style.display = 'none';
+        }
+
+        // 点击弹框外部关闭弹框
+        window.onclick = function (event) {
+            const modal = document.getElementById('resultModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+
+</html>
